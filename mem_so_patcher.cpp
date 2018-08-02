@@ -13,9 +13,15 @@ bool mem_so_patcher::linker_hooked = false;
 std::map<std::string, mem_so_patcher::lib_info> mem_so_patcher::libs;
 std::vector<code_region> mem_so_patcher::code_regions;
 
+#ifdef __i386__
+static unsigned char pattern_syscall_05_open[]    = { 0x53, 0x51, 0x52, 0x56, 0x8B, 0x5C, 0x24, 0x14, 0x8B, 0x4C, 0x24, 0x18, 0x8B, 0x54, 0x24, 0x1C, 0x8B, 0x74, 0x24, 0x20, 0xB8, 0x05, 0x00, 0x00, 0x00, 0xCD, 0x80 };
+static unsigned char pattern_syscall_142_openat[] = { 0x53, 0x51, 0x52, 0x56, 0x8B, 0x5C, 0x24, 0x14, 0x8B, 0x4C, 0x24, 0x18, 0x8B, 0x54, 0x24, 0x1C, 0x8B, 0x74, 0x24, 0x20, 0xB8, 0x27, 0x01, 0x00, 0x00, 0xCD, 0x80 };
+static unsigned char pattern_syscall_C0_mmap2[]   = { 0x53, 0x51, 0x52, 0x56, 0x57, 0x55, 0x8B, 0x5C, 0x24, 0x1C, 0x8B, 0x4C, 0x24, 0x20, 0x8B, 0x54, 0x24, 0x24, 0x8B, 0x74, 0x24, 0x28, 0x8B, 0x7C, 0x24, 0x2C, 0x8B, 0x6C, 0x24, 0x30, 0xB8, 0xC0, 0x00, 0x00, 0x00, 0xCD, 0x80 };
+#else
 static unsigned char pattern_syscall_05_open[]    = { 0x07, 0xC0, 0xA0, 0xE1, 0x05, 0x70, 0xA0, 0xE3, 0x00, 0x00, 0x00, 0xEF, 0x0C, 0x70, 0xA0, 0xE1 };
 static unsigned char pattern_syscall_142_openat[] = { 0x07, 0xC0, 0xA0, 0xE1, 0x42, 0x71, 0x00, 0xE3, 0x00, 0x00, 0x00, 0xEF, 0x0C, 0x70, 0xA0, 0xE1 };
 static unsigned char pattern_syscall_C0_mmap2[]   = { 0x0D, 0xC0, 0xA0, 0xE1, 0xF0, 0x00, 0x2D, 0xE9, 0x70, 0x00, 0x9C, 0xE8, 0xC0, 0x70, 0xA0, 0xE3, 0x00, 0x00, 0x00, 0xEF, 0xF0, 0x00, 0xBD, 0xE8 };
+#endif
 
 void code_region::free() {
     if (start != nullptr)
@@ -52,8 +58,35 @@ void* mem_so_patcher::allocate_trampoline(size_t size) {
 }
 
 void mem_so_patcher::hook_syscall(void *ptr, void *hook, void **orig) {
-    bool thumb = (((size_t) ptr) & 1) != 0;
     unsigned char* data = (unsigned char*) ptr;
+#ifdef __i386__
+    size_t trampoline_bytes = 0;
+    for ( ; trampoline_bytes < 5; ) {
+        unsigned char b = data[trampoline_bytes];
+        if (b >= 0x50 && b <= 0x50 + 8) // PUSH
+            trampoline_bytes++;
+        else if (b == 0x8B) // MOV r16, r/m16
+            trampoline_bytes += 4;
+        else
+            abort();
+    }
+
+    char* t_data = (char*) allocate_trampoline(trampoline_bytes + 5);
+    memcpy(t_data, data, trampoline_bytes);
+    t_data[trampoline_bytes] = 0xe9;
+    *((int*) &t_data[trampoline_bytes + 1]) = (int) (data + trampoline_bytes) - (int) (t_data + trampoline_bytes) - 5;
+    *orig = t_data;
+
+    int ps = sysconf(_SC_PAGESIZE);
+    void* data_page = (void*) ((size_t) ptr / ps * ps);
+    if (mprotect(data_page, (size_t) data - (size_t) data_page + 5, PROT_READ | PROT_WRITE | PROT_EXEC) < 0)
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "mprotect failed");
+    data[0] = 0xe9;
+    *((int*) &data[1]) = (int) (size_t) hook - (int) (size_t) data - 5;
+
+    __builtin___clear_cache((char*) data, (char*) data + 5);
+#else
+    bool thumb = (((size_t) ptr) & 1) != 0;
     if (thumb) { // thumb is not currently used
         abort();
     }
@@ -74,6 +107,7 @@ void mem_so_patcher::hook_syscall(void *ptr, void *hook, void **orig) {
     *((void**) &data[4]) = hook;
 
     __builtin___clear_cache((char*) data, (char*) data + 8);
+#endif
 }
 
 void mem_so_patcher::hook_linker_syscall(void* linker_start, size_t linker_size,
@@ -136,8 +170,8 @@ int mem_so_patcher::linker_hooks::open_hook(const char *filename, int flags, uns
 int (*mem_so_patcher::linker_hooks::openat_orig)(int, const char*, int, int);
 int mem_so_patcher::linker_hooks::openat_hook(int dirfd, const char *filename, int flags,
                                               int mode) {
-    __android_log_print(ANDROID_LOG_VERBOSE, TAG, "openat(%i %s) = %i", dirfd, filename, 0);
     int ret = openat_orig(dirfd, filename, flags, mode);
+    __android_log_print(ANDROID_LOG_VERBOSE, TAG, "openat(%i %s) = %i", dirfd, filename, ret);
     if (dirfd == AT_FDCWD && ret >= 0) {
         auto it = libs.find(filename);
         if (it != libs.end()) {
