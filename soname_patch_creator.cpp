@@ -15,7 +15,7 @@ std::vector<so_patch> soname_patch_creator::create_patch_list(
         throw soname_patch_error("Failed to read the ELF header");
     char phdr[header.e_phentsize * header.e_phnum];
     if (fseek(file, (long) header.e_phoff, SEEK_SET) != 0 ||
-            fread(&phdr, header.e_phentsize, header.e_phnum, file) != header.e_phnum)
+            fread(phdr, header.e_phentsize, header.e_phnum, file) != header.e_phnum)
         throw soname_patch_error("Failed to read the program headers");
     Elf32_Phdr *dynamic = nullptr;
     for (int i = 0; i < header.e_phnum; i++) {
@@ -48,8 +48,9 @@ std::vector<so_patch> soname_patch_creator::create_patch_list(
     }
     /* dump string table */
     char *strtab_data = new char[strtab_size];
-    assert(fseek(file, (long) strtab_off, SEEK_SET) == 0);
-    assert(fread(strtab_data, strtab_size, 1, file) == 1);
+    if (fseek(file, (long) strtab_off, SEEK_SET) != 0 ||
+            fread(strtab_data, strtab_size, 1, file) != 1)
+        throw soname_patch_error("Failed to find strtab");
 
     /* add libminecraftpe.so to string table */
     const char *to_replace = "_ZNK19AppLifecycleContext17getHasWindowFocusEv";
