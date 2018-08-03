@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "so_patch.h"
 
 /**
  * code_region represents a memory region which is supposed to be mapped as exec+write, in which
@@ -62,13 +63,9 @@ public:
 class mem_so_patcher {
 
 public:
-    struct patch {
-        size_t start;
-        std::vector<char> data;
-    };
     struct lib_info {
         int fd = -1;
-        std::vector<patch> patches;
+        std::vector<so_patch> patches;
     };
 
 
@@ -80,9 +77,12 @@ public:
 
     static void hook_syscall(void* ptr, void* hook, void** orig);
 
-    static void hook_linker_syscall(void* linker_start, size_t linker_size,
+    static bool hook_linker_syscall(void* linker_start, size_t linker_size,
                                     const char* name, void* pattern, size_t pattern_size,
                                     void* hook, void** orig);
+
+    static unsigned int* simple_find(unsigned int* haystack, size_t haystack_size,
+                                     unsigned int* needle, size_t needle_size, unsigned int* mask);
 
     static void hook_linker_syscalls();
 
@@ -99,6 +99,6 @@ public:
     };
 
 public:
-    static void* load_library(std::string const& path, std::vector<patch> patches);
+    static void* load_library(std::string const& path, std::vector<so_patch> patches);
 
 };

@@ -5,9 +5,9 @@
 
 #define TAG "SoPatcher"
 
-std::vector<mem_so_patcher::patch> soname_patch_creator::create_patch_list(
+std::vector<so_patch> soname_patch_creator::create_patch_list(
         FILE *file, const char* soname) {
-    std::vector<mem_so_patcher::patch> patches;
+    std::vector<so_patch> patches;
 
     Elf32_Ehdr header;
     if (fseek(file, 0, SEEK_SET) != 0 ||

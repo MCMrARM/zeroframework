@@ -3,7 +3,7 @@
 #include <vector>
 #include <exception>
 #include <string>
-#include "mem_so_patcher.h"
+#include "so_patch.h"
 
 class soname_patch_error : public std::exception {
 private:
@@ -19,6 +19,6 @@ public:
 class soname_patch_creator {
 
 public:
-    static std::vector<mem_so_patcher::patch> create_patch_list(FILE *file, const char* soname);
+    static std::vector<so_patch> create_patch_list(FILE *file, const char* soname);
 
 };
