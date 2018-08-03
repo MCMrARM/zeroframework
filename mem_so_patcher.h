@@ -62,14 +62,15 @@ public:
 
 class mem_so_patcher {
 
-public:
+private:
     struct lib_info {
         int fd = -1;
         std::vector<so_patch> patches;
     };
 
 
-    static bool linker_hooked;
+    static bool linker_hook_attempted;
+    static bool linker_hook_successful;
     static std::map<std::string, lib_info> libs;
     static std::vector<code_region> code_regions;
 
@@ -84,8 +85,6 @@ public:
     static unsigned int* simple_find(unsigned int* haystack, size_t haystack_size,
                                      unsigned int* needle, size_t needle_size, unsigned int* mask);
 
-    static void hook_linker_syscalls();
-
 
     struct linker_hooks {
         static int (*open_orig)(const char*, int, unsigned short);
@@ -99,6 +98,8 @@ public:
     };
 
 public:
+    static bool hook_linker_syscalls();
+
     static void* load_library(std::string const& path, std::vector<so_patch> patches);
 
 };

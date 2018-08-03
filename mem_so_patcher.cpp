@@ -10,7 +10,8 @@
 
 #define TAG "MemSoPatcher"
 
-bool mem_so_patcher::linker_hooked = false;
+bool mem_so_patcher::linker_hook_attempted = false;
+bool mem_so_patcher::linker_hook_successful = false;
 std::map<std::string, mem_so_patcher::lib_info> mem_so_patcher::libs;
 std::vector<code_region> mem_so_patcher::code_regions;
 
@@ -159,10 +160,10 @@ unsigned int* mem_so_patcher::simple_find(unsigned int *haystack, size_t haystac
     return nullptr;
 }
 
-void mem_so_patcher::hook_linker_syscalls() {
-    if (linker_hooked)
-        return;
-    linker_hooked = true;
+bool mem_so_patcher::hook_linker_syscalls() {
+    if (linker_hook_attempted)
+        return linker_hook_successful;
+    linker_hook_attempted = true;
 
     __android_log_print(ANDROID_LOG_VERBOSE, TAG, "Patching linker");
     void* linker_map_start = nullptr;
@@ -178,17 +179,19 @@ void mem_so_patcher::hook_linker_syscalls() {
     }
     if (!linker_map_start) {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to find the linker map");
-        return;
+        return false;
     }
 #define HOOK_SYSCALL(name, hook) \
     hook_linker_syscall(linker_map_start, linker_map_size, #name, name, sizeof(name), \
         (void*) hook##_hook, (void**) &hook##_orig)
 
     auto start = std::chrono::steady_clock::now();
+    bool hooked_open_or_openat = false;
     bool hooked_mmap2 = HOOK_SYSCALL(pattern_syscall_C0_mmap2, linker_hooks::mmap2);
     if (hooked_mmap2) {
         bool hooked_open = HOOK_SYSCALL(pattern_syscall_05_open, linker_hooks::open);
         bool hooked_openat = HOOK_SYSCALL(pattern_syscall_142_openat, linker_hooks::openat);
+        hooked_open_or_openat = hooked_open || hooked_open_or_openat;
     } else {
 #ifndef __i386__
         // something is wrong clearly - try to find the alternative pattern
@@ -203,10 +206,14 @@ void mem_so_patcher::hook_linker_syscalls() {
                     ((unsigned char*) (p + 1) + ((*(p + 1)) & 0xFF) + 8);
             //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found match at %x = %x %x", (size_t) p, ((*(p + 1)) & 0xFF), off);
 
-            if (off == 0x05)
-                hook_syscall(p, (void*) linker_hooks::open_hook, (void**) &linker_hooks::open_orig);
-            if (off == 0x142)
-                hook_syscall(p, (void*) linker_hooks::openat_hook, (void**) &linker_hooks::openat_orig);
+            if (off == 0x05) {
+                hook_syscall(p, (void *) linker_hooks::open_hook, (void **) &linker_hooks::open_orig);
+                hooked_open_or_openat = true;
+            }
+            if (off == 0x142) {
+                hook_syscall(p, (void *) linker_hooks::openat_hook, (void **) &linker_hooks::openat_orig);
+                hooked_open_or_openat = true;
+            }
 
             p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
         }
@@ -220,8 +227,10 @@ void mem_so_patcher::hook_linker_syscalls() {
                     ((unsigned char*) (p + 3) + ((*(p + 3)) & 0xFF) + 8);
             //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found long  match at %x = %x", (size_t) p, off);
 
-            if (off == 0xC0)
-                hook_syscall(p, (void*) linker_hooks::mmap2_hook, (void**) &linker_hooks::mmap2_orig);
+            if (off == 0xC0) {
+                hook_syscall(p, (void *) linker_hooks::mmap2_hook, (void **) &linker_hooks::mmap2_orig);
+                hooked_mmap2 = true;
+            }
 
             p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
         }
@@ -231,6 +240,9 @@ void mem_so_patcher::hook_linker_syscalls() {
     __android_log_print(ANDROID_LOG_ERROR, TAG, "Took %f seconds", std::chrono::duration_cast<
             std::chrono::duration<float>>(end - start).count());
 #undef HOOK_SYSCALL
+
+    linker_hook_successful = hooked_open_or_openat && hooked_mmap2;
+    return linker_hook_successful;
 }
 
 int (*mem_so_patcher::linker_hooks::open_orig)(const char *, int, unsigned short);
@@ -309,7 +321,8 @@ void* mem_so_patcher::linker_hooks::mmap2_hook(void *addr, size_t len, int prot,
 }
 
 void* mem_so_patcher::load_library(std::string const& path, std::vector<so_patch> patches) {
-    hook_linker_syscalls();
+    if (!hook_linker_syscalls())
+        return nullptr;
     libs[path].patches = patches;
     void* ret = dlopen(path.c_str(), RTLD_LAZY);
     libs.erase(path);
