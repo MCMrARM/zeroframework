@@ -19,6 +19,8 @@ private:
 public:
     dlsym_weak_helper(void* handle, const char* lookup_symbol = "__bss_start");
 
+    Elf32_Word get_symbol_index(const char* symbol);
+
     void* dlsym(const char* symbol);
 
 };

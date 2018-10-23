@@ -62,6 +62,15 @@ unsigned int dlsym_weak_helper::elfhash(const char *symbol) {
     return h;
 }
 
+Elf32_Word dlsym_weak_helper::get_symbol_index(const char *symbol) {
+    unsigned int hash = elfhash(symbol) % hash_nbucket;
+    for (Elf32_Word index = hash_bucket[hash]; index != 0; index = hash_chain[index]) {
+        if (strcmp(&strtab[symtab[index].st_name], symbol) == 0)
+            return index;
+    }
+    return (Elf32_Word) -1;
+}
+
 void* dlsym_weak_helper::dlsym(const char *symbol) {
     unsigned int hash = elfhash(symbol) % hash_nbucket;
     for (Elf32_Word index = hash_bucket[hash]; index != 0; index = hash_chain[index]) {
