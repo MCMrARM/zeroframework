@@ -93,6 +93,7 @@ void mem_so_patcher::hook_syscall(void *ptr, void *hook, void **orig) {
     *((int*) &data[1]) = (int) (size_t) hook - (int) (size_t) data - 5;
 
     __builtin___clear_cache((char*) data, (char*) data + 5);
+
 #else
     bool thumb = (((size_t) ptr) & 1) != 0;
     if (thumb) { // thumb is not currently used
@@ -186,62 +187,60 @@ bool mem_so_patcher::hook_linker_syscalls() {
         (void*) hook##_hook, (void**) &hook##_orig)
 
     auto start = std::chrono::steady_clock::now();
-    bool hooked_open_or_openat = false;
     bool hooked_mmap2 = HOOK_SYSCALL(pattern_syscall_C0_mmap2, linker_hooks::mmap2);
-    if (hooked_mmap2) {
-        bool hooked_open = HOOK_SYSCALL(pattern_syscall_05_open, linker_hooks::open);
-        bool hooked_openat = HOOK_SYSCALL(pattern_syscall_142_openat, linker_hooks::openat);
-        hooked_open_or_openat = hooked_open || hooked_open_or_openat;
-    } else {
+    bool hooked_open = HOOK_SYSCALL(pattern_syscall_05_open, linker_hooks::open);
+    bool hooked_openat = HOOK_SYSCALL(pattern_syscall_142_openat, linker_hooks::openat);
+    linker_hook_successful = hooked_mmap2 && (hooked_open || hooked_openat);
+    if (linker_hook_successful)
+        return true;
 #ifndef __i386__
-        // something is wrong clearly - try to find the alternative pattern
-        unsigned int* p = (unsigned int*) linker_map_start;
-        size_t linker_map_end = (size_t) linker_map_start + linker_map_size;
-        while ((p = simple_find(p, linker_map_end - (size_t) p,
-                                pattern_syscall_alt_short, sizeof(pattern_syscall_alt_short_masks),
-                                pattern_syscall_alt_short_masks)) != nullptr) {
-            //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found match at %x", (size_t) p - (size_t) linker_map_start);
-            // handle the match
-            unsigned int off = *(unsigned int*)
-                    ((unsigned char*) (p + 1) + ((*(p + 1)) & 0xFF) + 8);
-            //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found match at %x = %x %x", (size_t) p, ((*(p + 1)) & 0xFF), off);
+    // try to find the alternative pattern
+    unsigned int* p = (unsigned int*) linker_map_start;
+    size_t linker_map_end = (size_t) linker_map_start + linker_map_size;
+    while ((p = simple_find(p, linker_map_end - (size_t) p,
+                            pattern_syscall_alt_short, sizeof(pattern_syscall_alt_short_masks),
+                            pattern_syscall_alt_short_masks)) != nullptr) {
+        //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found match at %x", (size_t) p - (size_t) linker_map_start);
+        // handle the match
+        unsigned int off = *(unsigned int*)
+                ((unsigned char*) (p + 1) + ((*(p + 1)) & 0xFF) + 8);
+        //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found match at %x = %x %x", (size_t) p, ((*(p + 1)) & 0xFF), off);
 
-            if (off == 0x05) {
-                hook_syscall(p, (void *) linker_hooks::open_hook, (void **) &linker_hooks::open_orig);
-                hooked_open_or_openat = true;
-            }
-            if (off == 0x142) {
-                hook_syscall(p, (void *) linker_hooks::openat_hook, (void **) &linker_hooks::openat_orig);
-                hooked_open_or_openat = true;
-            }
-
-            p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
+        if (off == 0x05 && !hooked_open) {
+            hook_syscall(p, (void *) linker_hooks::open_hook, (void **) &linker_hooks::open_orig);
+            hooked_open = true;
         }
-        p = (unsigned int*) linker_map_start;
-        while ((p = simple_find(p, linker_map_end - (size_t) p,
-                                pattern_syscall_alt_long, sizeof(pattern_syscall_alt_long_masks),
-                                pattern_syscall_alt_long_masks)) != nullptr) {
-            //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found long match at %x", (size_t) p);
-            // handle the match
-            unsigned int off = *(unsigned int*)
-                    ((unsigned char*) (p + 3) + ((*(p + 3)) & 0xFF) + 8);
-            //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found long  match at %x = %x", (size_t) p, off);
-
-            if (off == 0xC0) {
-                hook_syscall(p, (void *) linker_hooks::mmap2_hook, (void **) &linker_hooks::mmap2_orig);
-                hooked_mmap2 = true;
-            }
-
-            p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
+        if (off == 0x142 && !hooked_openat) {
+            hook_syscall(p, (void *) linker_hooks::openat_hook, (void **) &linker_hooks::openat_orig);
+            hooked_openat = true;
         }
-#endif
+
+        p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
     }
+    p = (unsigned int*) linker_map_start;
+    while ((p = simple_find(p, linker_map_end - (size_t) p,
+                            pattern_syscall_alt_long, sizeof(pattern_syscall_alt_long_masks),
+                            pattern_syscall_alt_long_masks)) != nullptr) {
+        //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found long match at %x", (size_t) p);
+        // handle the match
+        unsigned int off = *(unsigned int*)
+                ((unsigned char*) (p + 3) + ((*(p + 3)) & 0xFF) + 8);
+        //__android_log_print(ANDROID_LOG_ERROR, TAG, "Found long  match at %x = %x", (size_t) p, off);
+
+        if (off == 0xC0 && !hooked_mmap2) {
+            hook_syscall(p, (void *) linker_hooks::mmap2_hook, (void **) &linker_hooks::mmap2_orig);
+            hooked_mmap2 = true;
+        }
+
+        p += sizeof(pattern_syscall_alt_short_masks) / sizeof(int);
+    }
+#endif
     auto end = std::chrono::steady_clock::now();
     __android_log_print(ANDROID_LOG_ERROR, TAG, "Took %f seconds", std::chrono::duration_cast<
             std::chrono::duration<float>>(end - start).count());
 #undef HOOK_SYSCALL
 
-    linker_hook_successful = hooked_open_or_openat && hooked_mmap2;
+    linker_hook_successful = hooked_mmap2 && (hooked_open || hooked_openat);
     return linker_hook_successful;
 }
 
