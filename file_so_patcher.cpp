@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 
+using namespace zerof;
+
 std::string file_so_patcher::get_lib_filename(std::string const &path) {
     auto iof = path.rfind('/');
     if (iof != std::string::npos)

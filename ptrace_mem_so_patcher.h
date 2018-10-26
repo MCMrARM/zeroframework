@@ -4,6 +4,8 @@
 #include <vector>
 #include "so_patch.h"
 
+namespace zerof {
+
 class ptrace_mem_so_patcher {
 
 public:
@@ -24,3 +26,5 @@ public:
     static void* load_library(std::string path, std::vector<so_patch> patches);
 
 };
+
+}

@@ -8,6 +8,8 @@
 
 #define TAG "RelocHookManager"
 
+using namespace zerof;
+
 reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::from_base(base)) {
     this->base = base;
 

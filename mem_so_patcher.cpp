@@ -10,6 +10,8 @@
 
 #define TAG "MemSoPatcher"
 
+using namespace zerof;
+
 bool mem_so_patcher::linker_hook_attempted = false;
 bool mem_so_patcher::linker_hook_successful = false;
 std::map<std::string, mem_so_patcher::lib_info> mem_so_patcher::libs;

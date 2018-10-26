@@ -5,6 +5,8 @@
 #include <elf.h>
 #include "lib_utils.h"
 
+using namespace zerof;
+
 dlsym_helper::dlsym_helper(void *base) {
     this->base = base;
 

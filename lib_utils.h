@@ -2,6 +2,8 @@
 
 #include <elf.h>
 
+namespace zerof {
+
 class lib_utils {
 
 public:
@@ -10,3 +12,5 @@ public:
     static Elf32_Phdr* find_dynamic(void* base);
 
 };
+
+}

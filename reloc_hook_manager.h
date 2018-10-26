@@ -8,6 +8,8 @@
 #include <memory>
 #include "dlsym_helper.h"
 
+namespace zerof {
+
 class reloc_hook_manager {
 
 private:
@@ -103,3 +105,5 @@ public:
     void apply_hooks();
 
 };
+
+}

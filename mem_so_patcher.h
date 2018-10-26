@@ -5,6 +5,8 @@
 #include <map>
 #include "so_patch.h"
 
+namespace zerof {
+
 /**
  * code_region represents a memory region which is supposed to be mapped as exec+write, in which
  * we place trampoline functions.
@@ -103,3 +105,5 @@ public:
     static void* load_library(std::string const& path, std::vector<so_patch> patches);
 
 };
+
+}

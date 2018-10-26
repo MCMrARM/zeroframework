@@ -3,6 +3,8 @@
 #include <dlfcn.h>
 #include <stdexcept>
 
+using namespace zerof;
+
 void* lib_utils::find_lib_base(void *handle, const char *lookup_symbol) {
     void* sym = ::dlsym(handle, lookup_symbol);
     if (sym == nullptr)

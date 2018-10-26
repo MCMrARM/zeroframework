@@ -5,6 +5,8 @@
 #include <map>
 #include "so_patch.h"
 
+namespace zerof {
+
 class file_so_patcher {
 
 private:
@@ -18,3 +20,5 @@ public:
     void* load_library(std::string const& path, std::vector<so_patch> patches);
 
 };
+
+}

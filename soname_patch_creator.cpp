@@ -5,6 +5,8 @@
 
 #define TAG "SoPatcher"
 
+using namespace zerof;
+
 std::vector<so_patch> soname_patch_creator::create_patch_list(
         FILE *file, const char* soname) {
     std::vector<so_patch> patches;

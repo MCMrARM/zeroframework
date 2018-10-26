@@ -2,6 +2,8 @@
 
 #include <string>
 
+namespace zerof {
+
 class maps_helper {
 
 private:
@@ -31,3 +33,5 @@ public:
     map* next();
 
 };
+
+}

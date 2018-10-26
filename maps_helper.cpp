@@ -2,6 +2,8 @@
 
 #include <vector>
 
+using namespace zerof;
+
 int maps_helper::_getline(char** lineptr, size_t* n, FILE* stream) {
     if (*lineptr == nullptr || *n < 16) {
         *n = 64;

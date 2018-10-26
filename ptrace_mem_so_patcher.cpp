@@ -11,6 +11,8 @@
 
 #define TAG "PtraceSoPatcher"
 
+using namespace zerof;
+
 bool ptrace_mem_so_patcher::wait_for_syscall(patch_context *parg, pid_t pid) {
     int status;
     if (parg->finished)

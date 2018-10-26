@@ -5,6 +5,8 @@
 #include <string>
 #include "so_patch.h"
 
+namespace zerof {
+
 class soname_patch_error : public std::exception {
 private:
     std::string message;
@@ -22,3 +24,5 @@ public:
     static std::vector<so_patch> create_patch_list(FILE *file, const char* soname);
 
 };
+
+}
