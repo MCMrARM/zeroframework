@@ -2,9 +2,10 @@
 
 #include <dlfcn.h>
 #include <stdexcept>
+#include <algorithm>
 #include <elf.h>
 #include <android/log.h>
-#include "lib_utils.h"
+#include <zerof/lib_utils.h>
 
 #define TAG "RelocHookManager"
 

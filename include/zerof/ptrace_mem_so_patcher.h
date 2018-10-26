@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <atomic>
 #include "so_patch.h"
 
 namespace zerof {

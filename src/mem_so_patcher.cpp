@@ -1,6 +1,7 @@
 #include <zerof/mem_so_patcher.h>
 #include <zerof/maps_helper.h>
 
+#include <cstdlib>
 #include <sys/mman.h>
 #include <sys/sysconf.h>
 #include <android/log.h>

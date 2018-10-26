@@ -1,6 +1,7 @@
 #include <zerof/maps_helper.h>
 
 #include <vector>
+#include <stdexcept>
 
 using namespace zerof;
 

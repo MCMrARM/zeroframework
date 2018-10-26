@@ -54,6 +54,7 @@ int ptrace_mem_so_patcher::handle_ptrace(void *arg) {
     while (wait_for_syscall(parg, pid)) {
         struct user regs;
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+
         unsigned long syscall = regs.regs.uregs[7];
         // __android_log_print(ANDROID_LOG_DEBUG, TAG, "syscall: %lx", syscall);
         if (syscall == 0xC0) {
