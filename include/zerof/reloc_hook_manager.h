@@ -100,6 +100,8 @@ public:
 
     hook_instance* create_hook(void* lib, Elf32_Word symbol_index, void* replacement, void** orig);
 
+    hook_instance* create_hook(void* lib, const char* symbol_name, void* replacement, void** orig);
+
     void delete_hook(hook_instance* hook);
 
     void apply_hooks();

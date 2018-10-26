@@ -176,6 +176,14 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
     return ret;
 }
 
+reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
+        void *lib, const char *symbol_name, void *replacement, void **orig) {
+    auto lib_ir = libs.find(lib);
+    if (lib_ir == libs.end())
+        throw std::runtime_error("No such lib registered");
+    create_hook(lib, lib_ir->second->sym_helper.get_symbol_index(symbol_name), replacement, orig);
+}
+
 void reloc_hook_manager::delete_hook(hook_instance *hook) {
     if (hook->child) {
         hook->child->parent = hook->parent;
