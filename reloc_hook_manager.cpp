@@ -8,8 +8,7 @@
 
 #define TAG "RelocHookManager"
 
-reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(
-        dlsym_weak_helper::from_base(base)) {
+reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::from_base(base)) {
     this->base = base;
 
     Elf32_Phdr *dynamic = lib_utils::find_dynamic(base);

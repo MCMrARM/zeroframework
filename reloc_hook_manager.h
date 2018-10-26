@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <vector>
 #include <memory>
-#include "dlsym_weak.h"
+#include "dlsym_helper.h"
 
 class reloc_hook_manager {
 
@@ -61,7 +61,7 @@ private:
         Elf32_Word relsz = 0;
         Elf32_Rel* pltrel = nullptr;
         Elf32_Word pltrelsz = 0;
-        dlsym_weak_helper sym_helper;
+        dlsym_helper sym_helper;
 
         std::unordered_map<Elf32_Word, std::shared_ptr<hooked_symbol>> hooked_symbols;
 

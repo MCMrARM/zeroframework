@@ -1,11 +1,11 @@
-#include "dlsym_weak.h"
+#include "dlsym_helper.h"
 
 #include <dlfcn.h>
 #include <stdexcept>
 #include <elf.h>
 #include "lib_utils.h"
 
-dlsym_weak_helper::dlsym_weak_helper(void *base) {
+dlsym_helper::dlsym_helper(void *base) {
     this->base = base;
 
     Elf32_Phdr *dynamic = lib_utils::find_dynamic(base);
@@ -32,15 +32,15 @@ dlsym_weak_helper::dlsym_weak_helper(void *base) {
     }
 }
 
-dlsym_weak_helper dlsym_weak_helper::from_base(void *base) {
-    return dlsym_weak_helper(base);
+dlsym_helper dlsym_helper::from_base(void *base) {
+    return dlsym_helper(base);
 }
 
-dlsym_weak_helper dlsym_weak_helper::from_handle(void *handle, const char *lookup_symbol) {
-    return dlsym_weak_helper(lib_utils::find_lib_base(handle, lookup_symbol));
+dlsym_helper dlsym_helper::from_handle(void *handle, const char *lookup_symbol) {
+    return dlsym_helper(lib_utils::find_lib_base(handle, lookup_symbol));
 }
 
-unsigned int dlsym_weak_helper::elfhash(const char *symbol) {
+unsigned int dlsym_helper::elfhash(const char *symbol) {
     unsigned int h = 0;
     for ( ; *symbol; ++symbol) {
         h = (h << 4) + (unsigned char) *symbol;
@@ -52,7 +52,7 @@ unsigned int dlsym_weak_helper::elfhash(const char *symbol) {
     return h;
 }
 
-Elf32_Word dlsym_weak_helper::get_symbol_index(const char *symbol) {
+Elf32_Word dlsym_helper::get_symbol_index(const char *symbol) {
     unsigned int hash = elfhash(symbol) % hash_nbucket;
     for (Elf32_Word index = hash_bucket[hash]; index != 0; index = hash_chain[index]) {
         if (strcmp(&strtab[symtab[index].st_name], symbol) == 0)
@@ -61,7 +61,7 @@ Elf32_Word dlsym_weak_helper::get_symbol_index(const char *symbol) {
     return (Elf32_Word) -1;
 }
 
-void* dlsym_weak_helper::dlsym(const char *symbol) {
+void* dlsym_helper::dlsym(const char *symbol) {
     unsigned int hash = elfhash(symbol) % hash_nbucket;
     for (Elf32_Word index = hash_bucket[hash]; index != 0; index = hash_chain[index]) {
         if (strcmp(&strtab[symtab[index].st_name], symbol) == 0)
