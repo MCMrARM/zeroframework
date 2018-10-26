@@ -1,4 +1,4 @@
-#include "soname_patch_creator.h"
+#include <zerof/soname_patch_creator.h>
 
 #include <elf.h>
 #include <android/log.h>

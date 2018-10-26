@@ -1,4 +1,4 @@
-#include "ptrace_mem_so_patcher.h"
+#include <zerof/ptrace_mem_so_patcher.h>
 
 #include <unistd.h>
 #include <android/log.h>

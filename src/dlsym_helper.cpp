@@ -1,9 +1,9 @@
-#include "dlsym_helper.h"
+#include <zerof/dlsym_helper.h>
 
 #include <dlfcn.h>
 #include <stdexcept>
 #include <elf.h>
-#include "lib_utils.h"
+#include <zerof/lib_utils.h>
 
 using namespace zerof;
 

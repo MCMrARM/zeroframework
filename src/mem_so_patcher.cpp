@@ -1,5 +1,5 @@
-#include "mem_so_patcher.h"
-#include "maps_helper.h"
+#include <zerof/mem_so_patcher.h>
+#include <zerof/maps_helper.h>
 
 #include <sys/mman.h>
 #include <sys/sysconf.h>
