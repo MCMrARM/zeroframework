@@ -16,8 +16,12 @@ private:
 
     static unsigned int elfhash(const char* name);
 
+    dlsym_weak_helper(void* base);
+
 public:
-    dlsym_weak_helper(void* handle, const char* lookup_symbol = "__bss_start");
+    static dlsym_weak_helper from_handle(void* handle, const char* lookup_symbol = "__bss_start");
+
+    static dlsym_weak_helper from_base(void* base);
 
     Elf32_Word get_symbol_index(const char* symbol);
 
