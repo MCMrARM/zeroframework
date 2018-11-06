@@ -6,6 +6,7 @@
 #include <elf.h>
 #include <android/log.h>
 #include <zerof/lib_utils.h>
+#include <zerof/maps_helper.h>
 
 #define TAG "RelocHookManager"
 
@@ -110,14 +111,38 @@ void reloc_hook_manager::add_library(void *handle) {
             std::unique_ptr<lib_info>(new lib_info(lib_utils::find_lib_base(handle)));
 
     Elf32_Phdr *dynamic = lib_utils::find_dynamic(p->base);
-    size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(Elf32_Dyn));
-    Elf32_Dyn* dyn_data = (Elf32_Dyn*) ((size_t) p->base + dynamic->p_vaddr);
+    // size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(Elf32_Dyn));
+    // Elf32_Dyn* dyn_data = (Elf32_Dyn*) ((size_t) p->base + dynamic->p_vaddr);
+
+    // HACK: Some Android versions unfortunately modify the DT_NEEDED tag.
+    maps_helper maps;
+    maps_helper::map* m;
+    while ((m = maps.next()) != nullptr) {
+        if ((size_t) p->base + dynamic->p_vaddr >= m->start && (size_t) p->base + dynamic->p_vaddr < m->end)
+            break;
+    }
+    if (m == nullptr) {
+        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to find matching map");
+        return;
+    }
+    Elf32_Dyn* dyn_data = (Elf32_Dyn*) malloc(dynamic->p_memsz);
+    size_t dyn_data_count = (size_t) (dynamic->p_filesz / sizeof(Elf32_Dyn));
+    FILE* fp = fopen(m->name, "rb");
+    if (fp == nullptr) {
+        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to open file associated with the map");
+        return;
+    }
+    if (fseek(fp, dynamic->p_offset, SEEK_SET) != 0 || fread(dyn_data, dynamic->p_filesz, 1, fp) != 1) {
+        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to read the dynamic section");
+        return;
+    }
+    fclose(fp);
 
     for (int i = 0; i < dyn_data_count; i++) {
         if (dyn_data[i].d_tag == DT_NULL)
             break;
         if (dyn_data[i].d_tag == DT_NEEDED) {
-            void* dep = dlopen(&p->strtab[dyn_data[i].d_un.d_ptr], RTLD_NOLOAD);
+            void* dep = dlopen(&p->strtab[dyn_data[i].d_un.d_val], RTLD_NOLOAD);
             if (dep == nullptr)
                 continue;
             p->dependencies.push_back(dep);
@@ -125,6 +150,7 @@ void reloc_hook_manager::add_library(void *handle) {
             dlclose(dep);
         }
     }
+    free(dyn_data);
 }
 
 void reloc_hook_manager::remove_library(void *handle) {
