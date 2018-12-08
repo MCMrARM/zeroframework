@@ -10,6 +10,13 @@
 
 #define TAG "RelocHookManager"
 
+#ifndef RTLD_NOLOAD
+#define RTLD_NOLOAD	4
+#endif
+#ifndef R_386_JMP_SLOT
+#define R_386_JMP_SLOT 7
+#endif
+
 using namespace zerof;
 
 reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::from_base(base)) {
@@ -36,7 +43,7 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
             case DT_RELSZ:
                 relsz = (Elf32_Word) (dyn_data[i].d_un.d_val);
                 break;
-            case DT_PLTREL:
+            case DT_JMPREL:
                 pltrel = (Elf32_Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
             case DT_PLTRELSZ:
@@ -64,7 +71,7 @@ void reloc_hook_manager::lib_info::set_hook(
 
 
 void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz) {
-    for (size_t i = 0; i < relsz / sizeof(Elf32_Dyn); i++) {
+    for (size_t i = 0; i < relsz / sizeof(Elf32_Rel); i++) {
         Elf32_Word type = ELF32_R_TYPE(rel[i].r_info);
         Elf32_Word sym = ELF32_R_SYM(rel[i].r_info);
         Elf32_Word* addr = (Elf32_Word*) ((size_t) base + rel[i].r_offset);
@@ -81,8 +88,12 @@ void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz)
             continue;
 
         switch (type) {
-#ifndef __i386__
+#if defined(__i386__) || defined(__arm__)
+#if defined(__i386__)
+            case R_386_JMP_SLOT:
+#elif defined(__arm__)
             case R_ARM_JUMP_SLOT:
+#endif
                 original = (size_t) *addr;
                 (size_t&) *addr = replacement;
                 break;
@@ -197,9 +208,9 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
     } else if (ret->symbol->last_hook != nullptr) {
         ret->parent = ret->symbol->last_hook;
         ret->parent->child = ret;
-        ret->symbol->last_hook = ret;
         *orig = ret->parent->replacement;
     }
+    ret->symbol->last_hook = ret;
     return ret;
 }
 
@@ -208,7 +219,7 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
     auto lib_ir = libs.find(lib);
     if (lib_ir == libs.end())
         throw std::runtime_error("No such lib registered");
-    create_hook(lib, lib_ir->second->sym_helper.get_symbol_index(symbol_name), replacement, orig);
+    return create_hook(lib, lib_ir->second->sym_helper.get_symbol_index(symbol_name), replacement, orig);
 }
 
 void reloc_hook_manager::delete_hook(hook_instance *hook) {
