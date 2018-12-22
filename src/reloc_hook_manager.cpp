@@ -238,7 +238,10 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
     auto lib_ir = libs.find(lib);
     if (lib_ir == libs.end())
         throw std::runtime_error("No such lib registered");
-    return create_hook(lib, lib_ir->second->sym_helper.get_symbol_index(symbol_name), replacement, orig);
+    Elf32_Word sym_index = lib_ir->second->sym_helper.get_symbol_index(symbol_name);
+    if (sym_index == (Elf32_Word) -1)
+        throw std::runtime_error("No such symbol");
+    return create_hook(lib, sym_index, replacement, orig);
 }
 
 void reloc_hook_manager::delete_hook(hook_instance *hook) {
