@@ -100,6 +100,8 @@ public:
 
     void remove_library(void* handle);
 
+    void* resolve_symbol(void* lib, const char* symbol_name);
+
     hook_instance* create_hook(void* lib, Elf32_Word symbol_index, void* replacement, void** orig);
 
     hook_instance* create_hook(void* lib, const char* symbol_name, void* replacement, void** orig);

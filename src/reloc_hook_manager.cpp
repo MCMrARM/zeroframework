@@ -104,6 +104,7 @@ void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz)
             replacement = (size_t) sym_info.last_hook->replacement;
         else if (replacement == 0)
             continue;
+        __android_log_print(ANDROID_LOG_WARN, TAG, "Found hook for %s at %x", &strtab[symtab[sym].st_name], addr);
 
         switch (type) {
 #if defined(__i386__) || defined(__arm__)
@@ -264,4 +265,11 @@ void reloc_hook_manager::delete_hook(hook_instance *hook) {
 void reloc_hook_manager::apply_hooks() {
     for (auto const& lib : libs)
         lib.second->apply_hooks();
+}
+
+void* reloc_hook_manager::resolve_symbol(void *lib, const char *symbol_name) {
+    auto lib_ir = libs.find(lib);
+    if (lib_ir == libs.end())
+        throw std::runtime_error("No such lib registered");
+    return lib_ir->second->sym_helper.dlsym(symbol_name);
 }
