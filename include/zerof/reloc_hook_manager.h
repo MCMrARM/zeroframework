@@ -63,6 +63,8 @@ private:
         Elf32_Word relsz = 0;
         Elf32_Rel* pltrel = nullptr;
         Elf32_Word pltrelsz = 0;
+        void* relro = nullptr;
+        Elf32_Word relrosize = 0;
         dlsym_helper sym_helper;
 
         std::unordered_map<Elf32_Word, std::shared_ptr<hooked_symbol>> hooked_symbols;

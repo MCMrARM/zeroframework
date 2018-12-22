@@ -7,6 +7,7 @@
 #include <android/log.h>
 #include <zerof/lib_utils.h>
 #include <zerof/maps_helper.h>
+#include <sys/mman.h>
 
 #define TAG "RelocHookManager"
 
@@ -52,6 +53,23 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
             default:
                 break;
         }
+    }
+
+    Elf32_Ehdr *header = (Elf32_Ehdr*) base;
+    for (int i = 0; i < header->e_phnum; i++) {
+        Elf32_Phdr &entry = *((Elf32_Phdr *)
+                ((size_t) base + header->e_phoff + header->e_phentsize * i));
+        if (entry.p_type == PT_GNU_RELRO) {
+            relro = (void*) ((size_t) base + entry.p_vaddr);
+            relrosize = entry.p_memsz;
+        }
+    }
+
+    if (relro != nullptr) {
+        auto page_size = sysconf(_SC_PAGE_SIZE);
+        size_t pstart = (size_t) relro / page_size * page_size;
+        size_t psize = (size_t) relro - pstart + relrosize;
+        mprotect((void *) pstart, psize, PROT_READ | PROT_WRITE);
     }
 }
 
