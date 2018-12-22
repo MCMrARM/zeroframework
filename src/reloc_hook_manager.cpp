@@ -110,6 +110,7 @@ void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz)
 #if defined(__i386__)
             case R_386_JMP_SLOT:
 #elif defined(__arm__)
+            case R_ARM_ABS32:
             case R_ARM_JUMP_SLOT:
 #endif
                 original = (size_t) *addr;
