@@ -17,6 +17,9 @@
 #ifndef R_386_JMP_SLOT
 #define R_386_JMP_SLOT 7
 #endif
+#ifndef R_386_JMP_SLOT
+#define R_386_GLOB_DAT 6
+#endif
 
 using namespace zerof;
 
@@ -110,9 +113,11 @@ void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz)
 #if defined(__i386__) || defined(__arm__)
 #if defined(__i386__)
             case R_386_JMP_SLOT:
+            case R_386_GLOB_DAT:
 #elif defined(__arm__)
             case R_ARM_ABS32:
             case R_ARM_JUMP_SLOT:
+            case R_ARM_GLOB_DAT:
 #endif
                 original = (size_t) *addr;
                 (size_t&) *addr = replacement;
