@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <elf.h>
 #include <zerof/lib_utils.h>
+#include <cstring>
 
 using namespace zerof;
 

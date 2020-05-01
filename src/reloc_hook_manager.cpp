@@ -8,11 +8,15 @@
 #include <zerof/lib_utils.h>
 #include <zerof/maps_helper.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #define TAG "RelocHookManager"
 
 #ifndef RTLD_NOLOAD
 #define RTLD_NOLOAD	4
+#endif
+#ifndef R_386_32
+#define R_386_32 1
 #endif
 #ifndef R_386_JMP_SLOT
 #define R_386_JMP_SLOT 7
@@ -107,11 +111,12 @@ void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz)
             replacement = (size_t) sym_info.last_hook->replacement;
         else if (replacement == 0)
             continue;
-        __android_log_print(ANDROID_LOG_WARN, TAG, "Found hook for %s at %x", &strtab[symtab[sym].st_name], addr);
+        __android_log_print(ANDROID_LOG_DEBUG, TAG, "Found hook for %s at %x", &strtab[symtab[sym].st_name], addr);
 
         switch (type) {
 #if defined(__i386__) || defined(__arm__)
 #if defined(__i386__)
+            case R_386_32:
             case R_386_JMP_SLOT:
             case R_386_GLOB_DAT:
 #elif defined(__arm__)
