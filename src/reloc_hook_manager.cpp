@@ -30,10 +30,10 @@ using namespace zerof;
 reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::from_base(base)) {
     this->base = base;
 
-    Elf32_Phdr *dynamic = lib_utils::find_dynamic(base);
+    elf::Phdr *dynamic = lib_utils::find_dynamic(base);
 
-    size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(Elf32_Dyn));
-    Elf32_Dyn* dyn_data = (Elf32_Dyn*) ((size_t) base + dynamic->p_vaddr);
+    size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(elf::Dyn));
+    elf::Dyn* dyn_data = (elf::Dyn*) ((size_t) base + dynamic->p_vaddr);
 
     for (int i = 0; i < dyn_data_count; i++) {
         if (dyn_data[i].d_tag == DT_NULL)
@@ -43,28 +43,28 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
                 strtab = (const char*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
             case DT_SYMTAB:
-                symtab = (Elf32_Sym*) ((size_t) base + dyn_data[i].d_un.d_ptr);
+                symtab = (elf::Sym*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
             case DT_REL:
-                rel = (Elf32_Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
+                rel = (elf::Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
             case DT_RELSZ:
-                relsz = (Elf32_Word) (dyn_data[i].d_un.d_val);
+                relsz = (elf::Word) (dyn_data[i].d_un.d_val);
                 break;
             case DT_JMPREL:
-                pltrel = (Elf32_Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
+                pltrel = (elf::Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
             case DT_PLTRELSZ:
-                pltrelsz = (Elf32_Word) (dyn_data[i].d_un.d_val);
+                pltrelsz = (elf::Word) (dyn_data[i].d_un.d_val);
                 break;
             default:
                 break;
         }
     }
 
-    Elf32_Ehdr *header = (Elf32_Ehdr*) base;
+    elf::Ehdr *header = (elf::Ehdr*) base;
     for (int i = 0; i < header->e_phnum; i++) {
-        Elf32_Phdr &entry = *((Elf32_Phdr *)
+        elf::Phdr &entry = *((elf::Phdr *)
                 ((size_t) base + header->e_phoff + header->e_phentsize * i));
         if (entry.p_type == PT_GNU_RELRO) {
             relro = (void*) ((size_t) base + entry.p_vaddr);
@@ -80,7 +80,7 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
     }
 }
 
-const char* reloc_hook_manager::lib_info::get_symbol_name(Elf32_Word symbol_index) {
+const char* reloc_hook_manager::lib_info::get_symbol_name(elf::Word symbol_index) {
     return &strtab[symtab[symbol_index].st_name];
 }
 
@@ -90,16 +90,21 @@ void reloc_hook_manager::lib_info::set_hook(
 }
 
 void reloc_hook_manager::lib_info::set_hook(
-        Elf32_Word symbol_index, std::shared_ptr<reloc_hook_manager::hooked_symbol> hook) {
+        elf::Word symbol_index, std::shared_ptr<reloc_hook_manager::hooked_symbol> hook) {
     hooked_symbols[symbol_index] = hook;
 }
 
 
-void reloc_hook_manager::lib_info::apply_hooks(Elf32_Rel* rel, Elf32_Word relsz) {
-    for (size_t i = 0; i < relsz / sizeof(Elf32_Rel); i++) {
-        Elf32_Word type = ELF32_R_TYPE(rel[i].r_info);
-        Elf32_Word sym = ELF32_R_SYM(rel[i].r_info);
-        Elf32_Word* addr = (Elf32_Word*) ((size_t) base + rel[i].r_offset);
+void reloc_hook_manager::lib_info::apply_hooks(elf::Rel* rel, elf::Word relsz) {
+    for (size_t i = 0; i < relsz / sizeof(elf::Rel); i++) {
+#ifdef __LP64__
+        elf::Word type = ELF64_R_TYPE(rel[i].r_info);
+        elf::Word sym = ELF64_R_SYM(rel[i].r_info);
+#else
+        elf::Word type = ELF32_R_TYPE(rel[i].r_info);
+        elf::Word sym = ELF32_R_SYM(rel[i].r_info);
+#endif
+        elf::Word* addr = (elf::Word*) ((size_t) base + rel[i].r_offset);
         auto found_symbol = hooked_symbols.find(sym);
         if (found_symbol == hooked_symbols.end())
             continue;
@@ -151,9 +156,9 @@ void reloc_hook_manager::add_library(void *handle) {
     auto& p = libs[handle] =
             std::unique_ptr<lib_info>(new lib_info(lib_utils::find_lib_base(handle)));
 
-    Elf32_Phdr *dynamic = lib_utils::find_dynamic(p->base);
-    // size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(Elf32_Dyn));
-    // Elf32_Dyn* dyn_data = (Elf32_Dyn*) ((size_t) p->base + dynamic->p_vaddr);
+    elf::Phdr *dynamic = lib_utils::find_dynamic(p->base);
+    // size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(elf::Dyn));
+    // elf::Dyn* dyn_data = (elf::Dyn*) ((size_t) p->base + dynamic->p_vaddr);
 
     // HACK: Some Android versions unfortunately modify the DT_NEEDED tag.
     maps_helper maps;
@@ -166,8 +171,8 @@ void reloc_hook_manager::add_library(void *handle) {
         __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to find matching map");
         return;
     }
-    Elf32_Dyn* dyn_data = (Elf32_Dyn*) malloc(dynamic->p_memsz);
-    size_t dyn_data_count = (size_t) (dynamic->p_filesz / sizeof(Elf32_Dyn));
+    elf::Dyn* dyn_data = (elf::Dyn*) malloc(dynamic->p_memsz);
+    size_t dyn_data_count = (size_t) (dynamic->p_filesz / sizeof(elf::Dyn));
     FILE* fp = fopen(m->name, "rb");
     if (fp == nullptr) {
         __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to open file associated with the map");
@@ -205,7 +210,7 @@ void reloc_hook_manager::remove_library(void *handle) {
 }
 
 reloc_hook_manager::hooked_symbol* reloc_hook_manager::get_or_create_hook_symbol(
-        void *lib, Elf32_Word symbol_index) {
+        void *lib, elf::Word symbol_index) {
     auto lib_ir = libs.find(lib);
     if (lib_ir == libs.end())
         throw std::runtime_error("No such lib registered");
@@ -227,7 +232,7 @@ reloc_hook_manager::hooked_symbol* reloc_hook_manager::get_or_create_hook_symbol
 }
 
 reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
-        void *lib, Elf32_Word symbol_index, void *replacement, void **orig) {
+        void *lib, elf::Word symbol_index, void *replacement, void **orig) {
     auto symbol = get_or_create_hook_symbol(lib, symbol_index);
     hook_instance* ret = new hook_instance;
     ret->symbol = symbol;
@@ -249,8 +254,8 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
     auto lib_ir = libs.find(lib);
     if (lib_ir == libs.end())
         throw std::runtime_error("No such lib registered");
-    Elf32_Word sym_index = lib_ir->second->sym_helper.get_symbol_index(symbol_name);
-    if (sym_index == (Elf32_Word) -1)
+    elf::Word sym_index = lib_ir->second->sym_helper.get_symbol_index(symbol_name);
+    if (sym_index == (elf::Word) -1)
         throw std::runtime_error("No such symbol");
     return create_hook(lib, sym_index, replacement, orig);
 }

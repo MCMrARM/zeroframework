@@ -15,11 +15,11 @@ void* lib_utils::find_lib_base(void *handle, const char *lookup_symbol) {
     return info.dli_fbase;
 }
 
-Elf32_Phdr* lib_utils::find_dynamic(void *base) {
-    Elf32_Ehdr *header = (Elf32_Ehdr*) base;
-    Elf32_Phdr *dynamic = nullptr;
+elf::Phdr* lib_utils::find_dynamic(void *base) {
+    elf::Ehdr *header = (elf::Ehdr*) base;
+    elf::Phdr *dynamic = nullptr;
     for (int i = 0; i < header->e_phnum; i++) {
-        Elf32_Phdr &entry = *((Elf32_Phdr *)
+        elf::Phdr &entry = *((elf::Phdr *)
                 ((size_t) base + header->e_phoff + header->e_phentsize * i));
         if (entry.p_type == PT_DYNAMIC) {
             dynamic = &entry;

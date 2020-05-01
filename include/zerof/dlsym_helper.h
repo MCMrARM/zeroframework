@@ -1,6 +1,6 @@
 #pragma once
 
-#include <elf.h>
+#include "elf.h"
 
 namespace zerof {
 
@@ -10,11 +10,11 @@ private:
     void *base;
 
     const char *strtab = nullptr;
-    Elf32_Sym *symtab = nullptr;
-    Elf32_Word hash_nbucket = 0;
-    Elf32_Word hash_nchain = 0;
-    Elf32_Word *hash_bucket = nullptr;
-    Elf32_Word *hash_chain = nullptr;
+    elf::Sym *symtab = nullptr;
+    elf::Word hash_nbucket = 0;
+    elf::Word hash_nchain = 0;
+    elf::Word *hash_bucket = nullptr;
+    elf::Word *hash_chain = nullptr;
 
     static unsigned int elfhash(const char *name);
 
@@ -25,7 +25,7 @@ public:
 
     static dlsym_helper from_base(void *base);
 
-    Elf32_Word get_symbol_index(const char *symbol);
+    elf::Word get_symbol_index(const char *symbol);
 
     void *dlsym(const char *symbol);
 
