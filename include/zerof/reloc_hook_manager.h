@@ -61,6 +61,8 @@ private:
         elf::Sym* symtab = nullptr;
         elf::Rel* rel = nullptr;
         elf::Word relsz = 0;
+        elf::Rela* rela = nullptr;
+        elf::Word relasz = 0;
         elf::Rel* pltrel = nullptr;
         elf::Word pltrelsz = 0;
         void* relro = nullptr;
@@ -74,7 +76,11 @@ private:
         lib_info(void* base);
 
 
+        void process_rel(elf::Addr *addr, elf::Word type, elf::Word sym);
+
         void apply_hooks(elf::Rel* rel, elf::Word relsz);
+
+        void apply_hooks(elf::Rela* rel, elf::Word relsz);
 
     public:
         const char* get_symbol_name(elf::Word symbol_index);

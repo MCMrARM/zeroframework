@@ -51,6 +51,12 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
             case DT_RELSZ:
                 relsz = (elf::Word) (dyn_data[i].d_un.d_val);
                 break;
+            case DT_RELA:
+                rela = (elf::Rela*) ((size_t) base + dyn_data[i].d_un.d_ptr);
+                break;
+            case DT_RELASZ:
+                relasz = (elf::Word) (dyn_data[i].d_un.d_val);
+                break;
             case DT_JMPREL:
                 pltrel = (elf::Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
@@ -95,6 +101,50 @@ void reloc_hook_manager::lib_info::set_hook(
 }
 
 
+void reloc_hook_manager::lib_info::process_rel(elf::Addr *addr, elf::Word type, elf::Word sym) {
+    auto found_symbol = hooked_symbols.find(sym);
+    if (found_symbol == hooked_symbols.end())
+        return;
+    hooked_symbol& sym_info = *found_symbol->second;
+    size_t replacement = (size_t) sym_info.original;
+    size_t original = 0;
+
+    if (sym_info.last_hook != nullptr && sym_info.last_hook->replacement != nullptr)
+        replacement = (size_t) sym_info.last_hook->replacement;
+    else if (replacement == 0)
+        return;
+    __android_log_print(ANDROID_LOG_DEBUG, TAG, "Found hook for %s at %p", &strtab[symtab[sym].st_name], addr);
+
+    switch (type) {
+#if defined(__i386__) || defined(__arm__) || defined(__aarch64__)
+#if defined(__aarch64__)
+            case R_AARCH64_ABS64:
+            case R_AARCH64_JUMP_SLOT:
+            case R_AARCH64_GLOB_DAT:
+#elif defined(__i386__)
+            case R_386_32:
+            case R_386_JMP_SLOT:
+            case R_386_GLOB_DAT:
+#elif defined(__arm__)
+            case R_ARM_ABS32:
+            case R_ARM_JUMP_SLOT:
+            case R_ARM_GLOB_DAT:
+#endif
+            original = (size_t) *addr;
+            (size_t&) *addr = replacement;
+            break;
+#endif
+        default:
+            __android_log_print(ANDROID_LOG_WARN, TAG, "Unknown relocation type: %x", type);
+    }
+
+    if (original && sym_info.original == nullptr) {
+        sym_info.original = (void *) original;
+        if (sym_info.first_hook)
+            *sym_info.first_hook->orig = (void *) original;
+    }
+}
+
 void reloc_hook_manager::lib_info::apply_hooks(elf::Rel* rel, elf::Word relsz) {
     for (size_t i = 0; i < relsz / sizeof(elf::Rel); i++) {
 #ifdef __LP64__
@@ -104,49 +154,30 @@ void reloc_hook_manager::lib_info::apply_hooks(elf::Rel* rel, elf::Word relsz) {
         elf::Word type = ELF32_R_TYPE(rel[i].r_info);
         elf::Word sym = ELF32_R_SYM(rel[i].r_info);
 #endif
-        elf::Word* addr = (elf::Word*) ((size_t) base + rel[i].r_offset);
-        auto found_symbol = hooked_symbols.find(sym);
-        if (found_symbol == hooked_symbols.end())
-            continue;
-        hooked_symbol& sym_info = *found_symbol->second;
-        size_t replacement = (size_t) sym_info.original;
-        size_t original = 0;
+        elf::Addr* addr = (elf::Addr*) ((size_t) base + rel[i].r_offset);
 
-        if (sym_info.last_hook != nullptr && sym_info.last_hook->replacement != nullptr)
-            replacement = (size_t) sym_info.last_hook->replacement;
-        else if (replacement == 0)
-            continue;
-        __android_log_print(ANDROID_LOG_DEBUG, TAG, "Found hook for %s at %x", &strtab[symtab[sym].st_name], addr);
+        process_rel(addr, type, sym);
+    }
+}
 
-        switch (type) {
-#if defined(__i386__) || defined(__arm__)
-#if defined(__i386__)
-            case R_386_32:
-            case R_386_JMP_SLOT:
-            case R_386_GLOB_DAT:
-#elif defined(__arm__)
-            case R_ARM_ABS32:
-            case R_ARM_JUMP_SLOT:
-            case R_ARM_GLOB_DAT:
+void reloc_hook_manager::lib_info::apply_hooks(elf::Rela* rela, elf::Word relasz) {
+    for (size_t i = 0; i < relasz / sizeof(elf::Rela); i++) {
+#ifdef __LP64__
+        elf::Word type = ELF64_R_TYPE(rela[i].r_info);
+        elf::Word sym = ELF64_R_SYM(rela[i].r_info);
+#else
+        elf::Word type = ELF32_R_TYPE(rela[i].r_info);
+        elf::Word sym = ELF32_R_SYM(rela[i].r_info);
 #endif
-                original = (size_t) *addr;
-                (size_t&) *addr = replacement;
-                break;
-#endif
-            default:
-                __android_log_print(ANDROID_LOG_WARN, TAG, "Unknown relocation type: %x", type);
-        }
+        elf::Addr* addr = (elf::Addr*) ((size_t) base + rela[i].r_offset);
 
-        if (original && sym_info.original == nullptr) {
-            sym_info.original = (void *) original;
-            if (sym_info.first_hook)
-                *sym_info.first_hook->orig = (void *) original;
-        }
+        process_rel(addr, type, sym);
     }
 }
 
 void reloc_hook_manager::lib_info::apply_hooks() {
     apply_hooks(rel, relsz);
+    apply_hooks(rela, relasz);
     apply_hooks(pltrel, pltrelsz);
 }
 
