@@ -65,6 +65,7 @@ private:
         elf::Word relasz = 0;
         elf::Rel* pltrel = nullptr;
         elf::Word pltrelsz = 0;
+        bool pltrel_rela = false;
         void* relro = nullptr;
         elf::Word relrosize = 0;
         dlsym_helper sym_helper;

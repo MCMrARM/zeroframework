@@ -57,6 +57,10 @@ reloc_hook_manager::lib_info::lib_info(void *base) : sym_helper(dlsym_helper::fr
             case DT_RELASZ:
                 relasz = (elf::Word) (dyn_data[i].d_un.d_val);
                 break;
+            case DT_PLTREL:
+                if ((elf::Word) (dyn_data[i].d_un.d_val) == DT_RELA)
+                    pltrel_rela = true;
+                break;
             case DT_JMPREL:
                 pltrel = (elf::Rel*) ((size_t) base + dyn_data[i].d_un.d_ptr);
                 break;
@@ -178,7 +182,10 @@ void reloc_hook_manager::lib_info::apply_hooks(elf::Rela* rela, elf::Word relasz
 void reloc_hook_manager::lib_info::apply_hooks() {
     apply_hooks(rel, relsz);
     apply_hooks(rela, relasz);
-    apply_hooks(pltrel, pltrelsz);
+    if (pltrel_rela)
+        apply_hooks((elf::Rela *) pltrel, pltrelsz);
+    else
+        apply_hooks(pltrel, pltrelsz);
 }
 
 void reloc_hook_manager::add_library(void *handle) {
