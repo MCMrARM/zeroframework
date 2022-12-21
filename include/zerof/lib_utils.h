@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elf.h"
+#include <vector>
 
 namespace zerof {
 
@@ -11,6 +12,7 @@ public:
 
     static elf::Phdr* find_dynamic(void* base);
 
+    static std::vector<elf::Dyn> read_original_dynamic(void* base);
 };
 
 }

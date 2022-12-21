@@ -103,7 +103,7 @@ private:
 
 public:
 
-    void add_library(void* handle);
+    void add_library(void* handle, const char* lookup_symbol = "__bss_start");
 
     void remove_library(void* handle);
 

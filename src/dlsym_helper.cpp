@@ -5,6 +5,7 @@
 #include <elf.h>
 #include <zerof/lib_utils.h>
 #include <cstring>
+#include <android/log.h>
 
 using namespace zerof;
 

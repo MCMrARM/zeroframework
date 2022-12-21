@@ -188,45 +188,20 @@ void reloc_hook_manager::lib_info::apply_hooks() {
         apply_hooks(pltrel, pltrelsz);
 }
 
-void reloc_hook_manager::add_library(void *handle) {
+void reloc_hook_manager::add_library(void *handle, const char *lookup_symbol) {
     if (libs.count(handle) > 0)
         return;
-    auto& p = libs[handle] =
-            std::unique_ptr<lib_info>(new lib_info(lib_utils::find_lib_base(handle)));
+    auto& p = libs[handle] = std::unique_ptr<lib_info>(new lib_info(
+            lib_utils::find_lib_base(handle, lookup_symbol)));
 
     elf::Phdr *dynamic = lib_utils::find_dynamic(p->base);
-    // size_t dyn_data_count = (size_t) (dynamic->p_memsz / sizeof(elf::Dyn));
-    // elf::Dyn* dyn_data = (elf::Dyn*) ((size_t) p->base + dynamic->p_vaddr);
 
-    // HACK: Some Android versions unfortunately modify the DT_NEEDED tag.
-    maps_helper maps;
-    maps_helper::map* m;
-    while ((m = maps.next()) != nullptr) {
-        if ((size_t) p->base + dynamic->p_vaddr >= m->start && (size_t) p->base + dynamic->p_vaddr < m->end)
+    auto dyn_data = lib_utils::read_original_dynamic(p->base);
+    for (auto& dyn : dyn_data) {
+        if (dyn.d_tag == DT_NULL)
             break;
-    }
-    if (m == nullptr) {
-        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to find matching map");
-        return;
-    }
-    elf::Dyn* dyn_data = (elf::Dyn*) malloc(dynamic->p_memsz);
-    size_t dyn_data_count = (size_t) (dynamic->p_filesz / sizeof(elf::Dyn));
-    FILE* fp = fopen(m->name, "rb");
-    if (fp == nullptr) {
-        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to open file associated with the map");
-        return;
-    }
-    if (fseek(fp, dynamic->p_offset, SEEK_SET) != 0 || fread(dyn_data, dynamic->p_filesz, 1, fp) != 1) {
-        __android_log_print(ANDROID_LOG_WARN, TAG, "Failed to read the dynamic section");
-        return;
-    }
-    fclose(fp);
-
-    for (int i = 0; i < dyn_data_count; i++) {
-        if (dyn_data[i].d_tag == DT_NULL)
-            break;
-        if (dyn_data[i].d_tag == DT_NEEDED) {
-            void* dep = dlopen(&p->strtab[dyn_data[i].d_un.d_val], RTLD_NOLOAD);
+        if (dyn.d_tag == DT_NEEDED) {
+            void* dep = dlopen(&p->strtab[dyn.d_un.d_val], RTLD_NOLOAD);
             if (dep == nullptr)
                 continue;
             p->dependencies.push_back(dep);
@@ -234,7 +209,6 @@ void reloc_hook_manager::add_library(void *handle) {
             dlclose(dep);
         }
     }
-    free(dyn_data);
 }
 
 void reloc_hook_manager::remove_library(void *handle) {
@@ -294,7 +268,7 @@ reloc_hook_manager::hook_instance* reloc_hook_manager::create_hook(
         throw std::runtime_error("No such lib registered");
     elf::Word sym_index = lib_ir->second->sym_helper.get_symbol_index(symbol_name);
     if (sym_index == (elf::Word) -1)
-        throw std::runtime_error("No such symbol");
+        throw std::runtime_error((std::string("No such symbol: ") + symbol_name).c_str());
     return create_hook(lib, sym_index, replacement, orig);
 }
 

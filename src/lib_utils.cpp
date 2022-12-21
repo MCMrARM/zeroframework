@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 #include <stdexcept>
+#include <zerof/maps_helper.h>
 
 using namespace zerof;
 
@@ -29,4 +30,27 @@ elf::Phdr* lib_utils::find_dynamic(void *base) {
     if (dynamic == nullptr)
         throw std::runtime_error("Failed to find PT_DYNAMIC in the specified library");
     return dynamic;
+}
+
+std::vector<elf::Dyn> lib_utils::read_original_dynamic(void* base) {
+    auto dynamic = find_dynamic(base);
+
+    maps_helper maps;
+    maps_helper::map* m;
+    while ((m = maps.next()) != nullptr) {
+        if ((size_t) base + dynamic->p_vaddr >= m->start && (size_t) base + dynamic->p_vaddr < m->end)
+            break;
+    }
+    if (m == nullptr)
+        throw std::runtime_error("Failed to find matching map");
+    std::vector<elf::Dyn> dyn_data (dynamic->p_memsz / sizeof(elf::Dyn));
+    FILE* fp = fopen(m->name, "rb");
+    if (fp == nullptr)
+        throw std::runtime_error("Failed to open file associated with the map");
+    if (fseek(fp, dynamic->p_offset, SEEK_SET) != 0 ||
+        fread(dyn_data.data(), sizeof(elf::Dyn), dyn_data.size(), fp) != dyn_data.size())
+        throw std::runtime_error("Failed to read the dynamic section");
+    fclose(fp);
+
+    return dyn_data;
 }
